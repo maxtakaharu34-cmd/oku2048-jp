@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="theme-color" content="#faf8ef" />
+<title>億万長者2048</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", system-ui, sans-serif;
+  background: #faf8ef; color: #776e65;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+#app {
+  max-width: 420px; margin: 0 auto;
+  padding: 12px; display: flex; flex-direction: column;
+  height: 100dvh; gap: 10px;
+}
+header {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.title { font-size: 44px; font-weight: 800; color: #776e65; margin: 0; }
+.scores { display: flex; gap: 6px; }
+.scorebox {
+  background: #bbada0; color: #fff;
+  padding: 4px 12px 6px; border-radius: 6px;
+  text-align: center; min-width: 64px;
+}
+.scorebox .l { font-size: 10px; letter-spacing: 0.1em; opacity: 0.85; }
+.scorebox .v { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.intro {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px; color: #776e65;
+}
+.btn {
+  background: #8f7a66; color: #f9f6f2;
+  border: 0; border-radius: 6px;
+  padding: 8px 14px; cursor: pointer;
+  font: inherit; font-weight: 700; font-size: 14px;
+}
+.btn:active { transform: translateY(1px); }
+.board {
+  position: relative; aspect-ratio: 1;
+  background: #bbada0; border-radius: 8px; padding: 8px;
+  width: 100%;
+}
+.bg-grid {
+  position: absolute; inset: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 8px;
+}
+.bg-cell { background: rgba(238,228,218,0.35); border-radius: 4px; }
+.tiles { position: absolute; inset: 8px; }
+.tile {
+  position: absolute;
+  width: calc(25% - 6px); height: calc(25% - 6px);
+  background: #eee4da; color: #776e65;
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 800;
+  transition: transform 0.12s ease-out;
+}
+.tile.new { animation: pop 0.18s ease-out; }
+.tile.merged { animation: merge 0.2s ease-out; }
+@keyframes pop {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+@keyframes merge {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+/* Tile colors per value */
+.t-2    { background: #c9e7cb; color: #2a5a2e; font-size: 18px; }
+.t-4    { background: #b3dfb6; color: #2a5a2e; font-size: 18px; }
+.t-8    { background: #98d39a; color: #2a5a2e; font-size: 18px; }
+.t-16   { background: #7bc97e; color: #fff; font-size: 18px; }
+.t-32   { background: #5ab95e; color: #fff; font-size: 18px; }
+.t-64   { background: #f5d56b; color: #6a4a00; font-size: 18px; }
+.t-128  { background: #f5c138; color: #6a4a00; font-size: 18px; }
+.t-256  { background: #f5a821; color: #6a4a00; font-size: 18px; }
+.t-512  { background: #ff8a3a; color: #fff; font-size: 18px; }
+.t-1024 { background: #ff5577; color: #fff; font-size: 18px; }
+.t-2048 { background: #d4af37; color: #fff; font-size: 16px; box-shadow: 0 0 24px rgba(212,175,55,0.9); }
+.t-big  { background: #4a0066; color: #ffd700; font-size: 14px; box-shadow: 0 0 28px rgba(212,175,55,1); }
+
+.banner {
+  position: absolute; inset: 0;
+  background: rgba(238, 228, 218, 0.73);
+  border-radius: 8px;
+  display: none;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 10;
+}
+.banner.show { display: flex; }
+.banner h2 {
+  margin: 0 0 12px; font-size: 32px; font-weight: 800;
+  color: #776e65;
+}
+.banner.win h2 { color: #f9f6f2; }
+.banner.win { background: rgba(237, 194, 46, 0.5); }
+
+.help {
+  text-align: center; font-size: 11px; color: #776e65; opacity: 0.7;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1 class="title" style="font-size:30px;color:#d4af37;">億万長者💰</h1>
+    <div class="scores">
+      <div class="scorebox"><div class="l">SCORE</div><div class="v" id="score">0</div></div>
+      <div class="scorebox"><div class="l">BEST</div><div class="v" id="best">0</div></div>
+    </div>
+  </header>
+  <div class="intro">
+    <span>同じ金額をくっつけて <b>1億円</b>！</span>
+    <button class="btn" id="btn-new">新規</button>
+  </div>
+  <div class="board" id="board">
+    <div class="bg-grid">
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="banner" id="banner">
+      <h2 id="banner-text">ゲームオーバー</h2>
+      <button class="btn" id="btn-again">もう一度</button>
+    </div>
+  </div>
+  <div class="help">⬆⬇⬅➡ / WASD / スワイプ</div>
+</div>
+<script>
+(() => {
+  'use strict';
+  const N = 4;
+  const STORE = '2048_state_v1';
+  const $ = (id) => document.getElementById(id);
+  const tilesEl = $('tiles');
+  const scoreEl = $('score');
+  const bestEl = $('best');
+  const banner = $('banner');
+  const bannerText = $('banner-text');
+
+  // grid: N*N array of {value, id} | null. id is stable across moves for animation.
+  let grid, score, best, over, won, nextId;
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE));
+      if (s && Array.isArray(s.grid) && s.grid.length === N) {
+        grid = s.grid.map((row) => row.map((c) => c ? { ...c } : null));
+        score = s.score || 0;
+        best = s.best || 0;
+        nextId = s.nextId || 1;
+        over = false;
+        won = !!s.won;
+        return true;
+      }
+    } catch {}
+    return false;
+  }
+  function save() {
+    localStorage.setItem(STORE, JSON.stringify({ grid, score, best, nextId, won }));
+  }
+  function reset() {
+    grid = Array.from({ length: N }, () => Array(N).fill(null));
+    score = 0;
+    over = false;
+    won = false;
+    nextId = 1;
+    spawn(); spawn();
+    render();
+    save();
+  }
+  function spawn() {
+    const empties = [];
+    for (let r = 0; r < N; r++)
+      for (let c = 0; c < N; c++)
+        if (!grid[r][c]) empties.push([r, c]);
+    if (empties.length === 0) return false;
+    const [r, c] = empties[Math.floor(Math.random() * empties.length)];
+    grid[r][c] = { value: Math.random() < 0.9 ? 2 : 4, id: nextId++, isNew: true };
+    return true;
+  }
+
+  function move(dir) {
+    if (over) return;
+    // dir: 0=left,1=up,2=right,3=down
+    let moved = false;
+    let gained = 0;
+    // For each line, slide+merge.
+    const lines = getLines(dir);
+    const newLines = [];
+    for (const line of lines) {
+      const filt = line.filter(Boolean);
+      const merged = [];
+      for (let i = 0; i < filt.length; i++) {
+        if (i + 1 < filt.length && filt[i].value === filt[i + 1].value) {
+          merged.push({ value: filt[i].value * 2, id: filt[i].id, isMerged: true });
+          gained += filt[i].value * 2;
+          if (filt[i].value * 2 === 2048 && !won) won = true;
+          i++; // skip next
+        } else {
+          merged.push({ ...filt[i], isNew: false, isMerged: false });
+        }
+      }
+      while (merged.length < N) merged.push(null);
+      newLines.push(merged);
+      // Check movement
+      for (let i = 0; i < N; i++) {
+        const a = line[i], b = merged[i];
+        if ((a && b && a.id !== b.id && a.value !== b.value) || (a !== b && (!a !== !b))) {
+          moved = true;
+        }
+        if (a && b && a.id === b.id && a.value !== b.value) moved = true;
+        if (!a && b) moved = true;
+        if (a && !b) moved = true;
+      }
+    }
+    if (!moved) {
+      // simpler: compare flattened ids+values
+      // (above heuristic could miss something) — fall through and check via setLines difference
+    }
+    // Apply back
+    setLines(dir, newLines);
+    if (linesEqual(lines, newLines)) {
+      // No actual change — abort
+      return;
+    }
+    score += gained;
+    if (score > best) best = score;
+    spawn();
+    render();
+    save();
+    if (won && !over) {
+      over = true;
+      bannerText.textContent = '1億円 達成！🎉';
+      banner.classList.add('show', 'win');
+    } else if (!hasMoves()) {
+      over = true;
+      bannerText.textContent = '破産…';
+      banner.classList.add('show');
+      banner.classList.remove('win');
+    }
+  }
+  function linesEqual(a, b) {
+    for (let i = 0; i < a.length; i++) {
+      for (let j = 0; j < a[i].length; j++) {
+        const x = a[i][j], y = b[i][j];
+        if (!x && !y) continue;
+        if (!x || !y) return false;
+        if (x.id !== y.id || x.value !== y.value) return false;
+      }
+    }
+    return true;
+  }
+
+  // Get lines per direction (each line is left-to-right merge order)
+  function getLines(dir) {
+    const out = [];
+    if (dir === 0) for (let r = 0; r < N; r++) out.push([...grid[r]]);
+    if (dir === 2) for (let r = 0; r < N; r++) out.push([...grid[r]].reverse());
+    if (dir === 1) for (let c = 0; c < N; c++) out.push([0,1,2,3].map((r) => grid[r][c]));
+    if (dir === 3) for (let c = 0; c < N; c++) out.push([0,1,2,3].map((r) => grid[r][c]).reverse());
+    return out;
+  }
+  function setLines(dir, lines) {
+    if (dir === 0) for (let r = 0; r < N; r++) grid[r] = lines[r];
+    if (dir === 2) for (let r = 0; r < N; r++) grid[r] = lines[r].slice().reverse();
+    if (dir === 1) for (let c = 0; c < N; c++) for (let r = 0; r < N; r++) grid[r][c] = lines[c][r];
+    if (dir === 3) for (let c = 0; c < N; c++) {
+      const rev = lines[c].slice().reverse();
+      for (let r = 0; r < N; r++) grid[r][c] = rev[r];
+    }
+  }
+  function hasMoves() {
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      if (!grid[r][c]) return true;
+      const v = grid[r][c].value;
+      if (r + 1 < N && grid[r + 1][c] && grid[r + 1][c].value === v) return true;
+      if (c + 1 < N && grid[r][c + 1] && grid[r][c + 1].value === v) return true;
+    }
+    return false;
+  }
+
+  function render() {
+    while (tilesEl.firstChild) tilesEl.removeChild(tilesEl.firstChild);
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        const t = grid[r][c];
+        if (!t) continue;
+        const el = document.createElement('div');
+        const v = t.value;
+        const cls = v <= 2048 ? 't-' + v : 't-big';
+        el.className = 'tile ' + cls + (t.isNew ? ' new' : '') + (t.isMerged ? ' merged' : '');
+        // Money labels: 2 = ¥100, 4 = ¥200, ... 2048 = ¥102,400, etc.
+        // Goal at "2048" tile = 1億 (we relabel scale: 2 -> 1万円, 4 -> 2万円 ... 2048 -> 1024万 ≒ 1千万)
+        // Use thresholds for cuteness:
+        const money = (n) => {
+          const yen = n * 50000; // 2->10万, 2048->1.024億
+          if (yen >= 100000000) return (yen / 100000000).toFixed(1).replace(/\.0$/, '') + '億';
+          if (yen >= 10000) return Math.round(yen / 10000) + '万';
+          return yen + '円';
+        };
+        el.textContent = money(v);
+        // position: each cell is 25% with 8px gap
+        const left = c * 25 + '%';
+        const top = r * 25 + '%';
+        el.style.transform = `translate(calc(${c} * (100% + 8px) / 1 + 0px), calc(${r} * (100% + 8px) / 1 + 0px))`;
+        // Simpler: position via left/top using calc
+        el.style.left = `calc(${c} * (100% / 4) + ${c} * 8px / 4)`;
+        el.style.top  = `calc(${r} * (100% / 4) + ${r} * 8px / 4)`;
+        // Override translate above: set transform to none so left/top apply
+        el.style.transform = '';
+        tilesEl.appendChild(el);
+        // Clear flags so subsequent renders don't re-animate
+        t.isNew = false;
+        t.isMerged = false;
+      }
+    }
+    scoreEl.textContent = score;
+    bestEl.textContent = best;
+    if (best > +(localStorage.getItem('2048_best') || 0)) {
+      localStorage.setItem('2048_best', String(best));
+    }
+  }
+
+  // Input
+  window.addEventListener('keydown', (e) => {
+    let d = -1;
+    if (e.key === 'ArrowLeft' || e.key === 'a') d = 0;
+    else if (e.key === 'ArrowUp' || e.key === 'w') d = 1;
+    else if (e.key === 'ArrowRight' || e.key === 'd') d = 2;
+    else if (e.key === 'ArrowDown' || e.key === 's') d = 3;
+    if (d >= 0) { e.preventDefault(); move(d); }
+  });
+
+  // Touch swipe
+  let tx = 0, ty = 0;
+  const board = $('board');
+  board.addEventListener('touchstart', (e) => {
+    const t = e.touches[0]; tx = t.clientX; ty = t.clientY;
+  }, { passive: true });
+  board.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - tx, dy = t.clientY - ty;
+    if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 2 : 0);
+    else move(dy > 0 ? 3 : 1);
+  });
+
+  $('btn-new').addEventListener('click', () => {
+    banner.classList.remove('show', 'win');
+    reset();
+  });
+  $('btn-again').addEventListener('click', () => {
+    banner.classList.remove('show', 'win');
+    reset();
+  });
+
+  // Init: load best, init grid
+  best = +(localStorage.getItem('2048_best') || 0);
+  if (!load()) reset();
+  else render();
+})();
+</script>
+</body>
+</html>
